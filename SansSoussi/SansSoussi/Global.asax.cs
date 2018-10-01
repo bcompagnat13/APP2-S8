@@ -29,8 +29,20 @@ namespace SansSoussi
 
         }
 
+        // To remove ASP.NET headers, please refer to:
+        // https://blog.insiderattack.net/configuring-secure-iis-response-headers-in-asp-net-mvc-b38369030728
+        protected void Application_BeginRequest(object sender, EventArgs e)
+        {
+            var app = sender as HttpApplication;
+            if (app != null && app.Context != null)
+            {
+                app.Context.Response.Headers.Remove("Server");
+            }
+        }
+
         protected void Application_Start()
         {
+            MvcHandler.DisableMvcResponseHeader = true; //this line is to hide mvc header
             AreaRegistration.RegisterAllAreas();
 
             RegisterGlobalFilters(GlobalFilters.Filters);
