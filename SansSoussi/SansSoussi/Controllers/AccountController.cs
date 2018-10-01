@@ -10,6 +10,9 @@ using System.Web.Routing;
 using System.Web.Security;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
+using Google.Apis.Oauth2.v2;
+using Google.Apis.Plus.v1;
+using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using SansSoussi.Models;
 
@@ -21,9 +24,12 @@ namespace SansSoussi.Controllers
         public static string ApplicationName = "app2-s8";
         public static string ClientId = "228129901842-gq9a8n1csk6e9vlrco0ic7onvevdv89j.apps.googleusercontent.com";
         public static string ClientSecret = "tZZKfwxFSNjKnl9agUl40Gqq";
-
+        FileDataStore Oauth = new FileDataStore("Google_Oaut2");
+    
         public static string[] Scopes =  {
-                DriveService.Scope.Drive
+                PlusService.Scope.PlusMe,
+                PlusService.Scope.UserinfoEmail,
+                PlusService.Scope.UserinfoProfile
             };
 
         public IFormsAuthenticationService FormsService { get; set; }
@@ -66,53 +72,66 @@ namespace SansSoussi.Controllers
                         Scopes,
                         "user",
                         CancellationToken.None,
-                        new FileDataStore("Google Oaut2")
+                        Oauth
                         ).Result;
-
-                    int e = 2;
+                    
+                    
+                    var plusService = new PlusService(
+                    new BaseClientService.Initializer
+                        {
+                            HttpClientInitializer = credential,
+                            ApplicationName = "app2-s8"
+                    }
+                    );
+                    var userProfile = plusService.People.Get("me").Execute();
+                    var userEmail = userProfile.Emails[0].Value;
+                    
+                    if (MembershipService.ValidateUser(userProfile.DisplayName, userProfile.Id)) {
+                        FormsService.SignIn(userProfile.DisplayName, false /* createPersistentCookie */);
+                        //Encode the username in base64
+                        byte[] toEncodeAsBytes = System.Text.ASCIIEncoding.ASCII.GetBytes(userProfile.DisplayName);
+                        HttpCookie authCookie = new HttpCookie("username", System.Convert.ToBase64String(toEncodeAsBytes));
+                        HttpContext.Response.Cookies.Add(authCookie);
+                        return RedirectToAction("Index", "Home");
+                    } else
+                    {
+                        MembershipCreateStatus createStatus = MembershipService.CreateUser(userProfile.DisplayName, userProfile.Id, userEmail);
+                        if (createStatus == MembershipCreateStatus.Success)
+                        {
+                            FormsService.SignIn(userProfile.DisplayName, false /* createPersistentCookie */);
+                            //Encode the username in base64
+                            byte[] toEncodeAsBytes = System.Text.ASCIIEncoding.ASCII.GetBytes(userProfile.DisplayName);
+                            HttpCookie authCookie = new HttpCookie("username", System.Convert.ToBase64String(toEncodeAsBytes));
+                            HttpContext.Response.Cookies.Add(authCookie);
+                            return RedirectToAction("Index", "Home");
+                        }
+                        else
+                        {
+                            ModelState.AddModelError("", AccountValidation.ErrorCodeToString(createStatus));
+                        }
+                    }
                 }
                 catch(Exception ex)
                 {
                     credential = null;
-                    ModelState.AddModelError("", "Authentification failed : " + ex.ToString());
+                    ModelState.AddModelError("", ex.ToString());
                 }
 
-
-
-                /*
-                if (MembershipService.ValidateUser(model.UserName, model.Password))
-                {
-                    FormsService.SignIn(model.UserName, model.RememberMe);
-                    if (Url.IsLocalUrl(returnUrl))
-                    {
-                        return Redirect(returnUrl);
-                    }
-                    else
-                    {
-                        //Encode the username in base64
-                        byte[] toEncodeAsBytes = System.Text.ASCIIEncoding.ASCII.GetBytes(model.UserName);
-                        HttpCookie authCookie = new HttpCookie("username", System.Convert.ToBase64String(toEncodeAsBytes));
-                        HttpContext.Response.Cookies.Add(authCookie);
-                        return RedirectToAction("Index", "Home");
-                    }
-                }
-                else
-                {
-                    ModelState.AddModelError("", "The user name or password provided is incorrect.");
-                }
-                */
+      
             }
 
             // If we got this far, something failed, redisplay form
             return View(model);
         }
 
+       
         // **************************************
         // URL: /Account/LogOff
         // **************************************
 
         public ActionResult LogOff()
         {
+            Oauth.ClearAsync();
             FormsService.SignOut();
 
             return RedirectToAction("Index", "Home");
