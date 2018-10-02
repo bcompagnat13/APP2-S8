@@ -18,12 +18,13 @@ using SansSoussi.Models;
 
 namespace SansSoussi.Controllers
 {
+    [RequireHttps]
     public class AccountController : Controller
     {
 
         public static string ApplicationName = "app2-s8";
         public static string ClientId = "228129901842-gq9a8n1csk6e9vlrco0ic7onvevdv89j.apps.googleusercontent.com";
-        public static string ClientSecret = "tZZKfwxFSNjKnl9agUl40Gqq";
+        public static string ClientSecret = "bZrzG8O4FaPZPZrCykK7cg6a";
         FileDataStore Oauth = new FileDataStore("Google_Oaut2");
     
         public static string[] Scopes =  {
@@ -62,7 +63,6 @@ namespace SansSoussi.Controllers
 
                 try
                 {
-                    CancellationToken taskCancellationToken = default(CancellationToken);
                     credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
                         new ClientSecrets
                         {

@@ -11,6 +11,7 @@ using SansSoussi.Filter;
 
 namespace SansSoussi.Controllers
 {
+    [RequireHttps]
     public class HomeController : Controller
     {
         private const int COUNT_BY_MINUTE = 15;

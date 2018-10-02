@@ -31,12 +31,18 @@ namespace SansSoussi
 
         // To remove ASP.NET headers, please refer to:
         // https://blog.insiderattack.net/configuring-secure-iis-response-headers-in-asp-net-mvc-b38369030728
-        protected void Application_BeginRequest(object sender, EventArgs e)
+        protected void Application_BeginRequest(Object sender, EventArgs e)
         {
-            var app = sender as HttpApplication;
-            if (app != null && app.Context != null)
+            switch (Request.Url.Scheme)
             {
-                app.Context.Response.Headers.Remove("Server");
+                case "https":
+                    Response.AddHeader("Strict-Transport-Security", "max-age=300");
+                    break;
+                case "http":
+                    var path = "https://" + Request.Url.Host + Request.Url.PathAndQuery;
+                    Response.Status = "301 Moved Permanently";
+                    Response.AddHeader("Location", path);
+                    break;
             }
         }
 
