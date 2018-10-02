@@ -29,7 +29,7 @@ namespace SansSoussi.Controllers
 
             return View();
         }
-
+        
         [Throttle(TimeUnit = TimeUnit.Minute, Count = COUNT_BY_MINUTE)]
         public ActionResult Comments()
         {
@@ -57,6 +57,8 @@ namespace SansSoussi.Controllers
         [HttpPost]
         [ValidateInput(false)]
         [Throttle(TimeUnit = TimeUnit.Minute, Count = COUNT_BY_MINUTE)]
+        // BUGFIX 1: Insere des pop-ups (XSS-S)
+        // <a onmouseover="alert(1)" href="#"> Salut pop-up12!</a>
         public ActionResult Comments(string comment)
         {
             string status = "success";
@@ -67,9 +69,13 @@ namespace SansSoussi.Controllers
                 if (user != null)
                 {
                     //add new comment to db
+                    // Now using Sql Parameters to prevent SQLi
                     SqlCommand cmd = new SqlCommand(
-                        "insert into Comments (UserId, CommentId, Comment) Values ('" + user.ProviderUserKey + "','" + Guid.NewGuid() + "','" + comment + "')",
-                    _dbConnection);
+                        "insert into Comments (UserId, CommentId, Comment) Values ('" + user.ProviderUserKey + "','" + Guid.NewGuid() + "',@comment)", _dbConnection);
+                    SqlParameter param = new SqlParameter("@comment", System.Data.SqlDbType.NVarChar, 115);
+                    param.Value = comment;
+                    cmd.Parameters.Add(param);
+
                     _dbConnection.Open();
 
                     cmd.ExecuteNonQuery();
@@ -91,6 +97,11 @@ namespace SansSoussi.Controllers
             return Json(status);
         }
 
+        // BUGFIX 1: Retourne le emails de tous les users
+        // GET: ' UNION ALL SELECT email FROM dbo.aspnet_Membership;--
+
+        // BUGFIX 2: Supprime un compte
+        // GET: http://localhost:1033/home/Search?searchData=%%27UNION%20ALL%20SELECT%20email%20FROM%20dbo.aspnet_Membership;--
         [Throttle(TimeUnit = TimeUnit.Minute, Count = COUNT_BY_MINUTE)]
         public ActionResult Search(string searchData)
         {
@@ -102,7 +113,12 @@ namespace SansSoussi.Controllers
             {
                 if (!string.IsNullOrEmpty(searchData))
                 {
-                    SqlCommand cmd = new SqlCommand("Select Comment from Comments where UserId = '" + user.ProviderUserKey + "' and Comment like '%" + searchData + "%'", _dbConnection);
+                    // Handling SQLi
+                    SqlCommand cmd = new SqlCommand("Select Comment from Comments where UserId = '" + user.ProviderUserKey + "' and Comment like @searchData", _dbConnection);
+                    SqlParameter param = new SqlParameter("@searchData", System.Data.SqlDbType.NVarChar, 16);
+                    param.Value = "%"+searchData+"%";
+                    cmd.Parameters.Add(param);
+
                     _dbConnection.Open();
                     SqlDataReader rd = cmd.ExecuteReader();
 
