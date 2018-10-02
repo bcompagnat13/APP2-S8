@@ -6,6 +6,7 @@ using System.Web.Mvc;
 using System.Data.SqlClient;
 using System.Web.Configuration;
 using System.Web.Security;
+using System.Text.RegularExpressions;
 
 using SansSoussi.Filter;
 
@@ -15,6 +16,11 @@ namespace SansSoussi.Controllers
     public class HomeController : Controller
     {
         private const int COUNT_BY_MINUTE = 15;
+
+        private string SanitizeComment(string text)
+        {
+            return Regex.Replace(text, @"[^\sA-z0-9,.!]", " ", RegexOptions.IgnoreCase);
+        }
 
         SqlConnection _dbConnection;
         public HomeController()
@@ -45,7 +51,7 @@ namespace SansSoussi.Controllers
 
                 while (rd.Read())
                 {
-                    comments.Add(rd.GetString(0));
+                    comments.Add(SanitizeComment(rd.GetString(0)));
                 }
 
                 rd.Close();
@@ -55,7 +61,7 @@ namespace SansSoussi.Controllers
         }
 
         [HttpPost]
-        [ValidateInput(false)]
+        [ValidateInput(true)]
         [Throttle(TimeUnit = TimeUnit.Minute, Count = COUNT_BY_MINUTE)]
         // BUGFIX 1: Insere des pop-ups (XSS-S)
         // <a onmouseover="alert(1)" href="#"> Salut pop-up12!</a>
@@ -68,6 +74,9 @@ namespace SansSoussi.Controllers
                 MembershipUser user = Membership.Provider.GetUser(HttpContext.User.Identity.Name, true);
                 if (user != null)
                 {
+                    // Sanitize to prevent XSS-S
+                    comment = SanitizeComment(comment);
+
                     //add new comment to db
                     // Now using Sql Parameters to prevent SQLi
                     SqlCommand cmd = new SqlCommand(
@@ -125,7 +134,7 @@ namespace SansSoussi.Controllers
 
                     while (rd.Read())
                     {
-                        searchResults.Add(rd.GetString(0));
+                        searchResults.Add(SanitizeComment(rd.GetString(0)));
                     }
 
                     rd.Close();
@@ -169,7 +178,7 @@ namespace SansSoussi.Controllers
                 SqlDataReader rd = cmd.ExecuteReader();
                 while (rd.Read())
                 {
-                    searchResults.Add(rd.GetString(0));
+                    searchResults.Add(SanitizeComment(rd.GetString(0)));
                 }
                 rd.Close();
                 _dbConnection.Close();
