@@ -6,6 +6,7 @@ using System.Web.Mvc;
 using System.Data.SqlClient;
 using System.Web.Configuration;
 using System.Web.Security;
+using System.Text.RegularExpressions;
 
 using SansSoussi.Filter;
 
@@ -15,6 +16,11 @@ namespace SansSoussi.Controllers
     public class HomeController : Controller
     {
         private const int COUNT_BY_MINUTE = 15;
+
+        private string SanitizeComment(string text)
+        {
+            return Regex.Replace(text, @"[^\sA-z0-9,.!]", " ", RegexOptions.IgnoreCase);
+        }
 
         SqlConnection _dbConnection;
         public HomeController()
@@ -45,7 +51,7 @@ namespace SansSoussi.Controllers
 
                 while (rd.Read())
                 {
-                    comments.Add(rd.GetString(0));
+                    comments.Add(SanitizeComment(rd.GetString(0)));
                 }
 
                 rd.Close();
@@ -55,7 +61,7 @@ namespace SansSoussi.Controllers
         }
 
         [HttpPost]
-        [ValidateInput(false)]
+        [ValidateInput(true)]
         [Throttle(TimeUnit = TimeUnit.Minute, Count = COUNT_BY_MINUTE)]
         public ActionResult Comments(string comment)
         {
@@ -68,7 +74,7 @@ namespace SansSoussi.Controllers
                 {
                     //add new comment to db
                     SqlCommand cmd = new SqlCommand(
-                        "insert into Comments (UserId, CommentId, Comment) Values ('" + user.ProviderUserKey + "','" + Guid.NewGuid() + "','" + comment + "')",
+                        "insert into Comments (UserId, CommentId, Comment) Values ('" + user.ProviderUserKey + "','" + Guid.NewGuid() + "','" + SanitizeComment(comment) + "')",
                     _dbConnection);
                     _dbConnection.Open();
 
@@ -109,7 +115,7 @@ namespace SansSoussi.Controllers
 
                     while (rd.Read())
                     {
-                        searchResults.Add(rd.GetString(0));
+                        searchResults.Add(SanitizeComment(rd.GetString(0)));
                     }
 
                     rd.Close();
@@ -153,7 +159,7 @@ namespace SansSoussi.Controllers
                 SqlDataReader rd = cmd.ExecuteReader();
                 while (rd.Read())
                 {
-                    searchResults.Add(rd.GetString(0));
+                    searchResults.Add(SanitizeComment(rd.GetString(0)));
                 }
                 rd.Close();
                 _dbConnection.Close();
